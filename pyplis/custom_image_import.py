@@ -115,7 +115,7 @@ def load_hd_new(file_path, meta={}):
     return (img, meta)
 
 def _read_binary_timestamp(timestamp):
-    """ Converts the an array of pixel as given by the pco camware software to
+    """ Converts an (1,14)-array of pixel as given by the pco camware software to
     a valid datetime 
 
     Parameters
@@ -156,17 +156,17 @@ def _read_binary_timestamp(timestamp):
     return endtime
 
 def load_comtessa(file_path, meta={}):
-    """ Load image from a comtessa fits file (several images in one file)
+    """ Load image from a multi-layered fits file (several images in one file)
     Meta data is available only inside the header.
     
     Note
     ----
     The comtessa *.fits files have several timestamps: 1) Filename --> minute 
     in which the image was saved. 2) Meta information in the image header -->
-    computer time when the image was saved. 3) First 14 pixel contain binary
-    timestamp --> time when exposure was finished. Here nr 3) is saved as
-    meta['stop_acq'] and nr 2) as meta['custom1']. meta['start_acq'] is
-    calculated from meta['stop_acq'] and meta['texp'].
+    computer time when the image was saved. 3) First 14 image pixels contain
+    a binary timestamp --> time when exposure was finished. Here nr 3) is saved
+    as meta['stop_acq']. meta['start_acq'] is calculated from meta['stop_acq'] 
+    and meta['texp']. meta['user_param1'] is the gain (float type).
     
     Parameters
     ----------
@@ -175,7 +175,7 @@ def load_comtessa(file_path, meta={}):
     meta: dictionary
         optional, meta info dictionary to which additional meta
         information is appended. The image index should be provided with key 
-        "img_idx".
+        "fits_idx".
         
     Returns 
     -------
@@ -188,12 +188,14 @@ def load_comtessa(file_path, meta={}):
     hdulist = fits.open(file_path)
     try:
         img_hdu = meta['img_idx']
+        #img_hdu = meta['fits_idx']
     except:
         img_hdu = 0
         meta['img_idx'] = 0
+        meta['fits_idx'] = 0
         warn("Loading of comtessa fits file without providing the image index "
              "of desired image within the file. Image index was set to 0. "
-             "Provide the image index via the meta = {'img_idx':0} keyword.")
+             "Provide the image index via the meta = {'fits_idx':0} keyword.")
     # Load the image
     image = hdulist[img_hdu].data
     # read and replace binary time stamp
@@ -206,9 +208,9 @@ def load_comtessa(file_path, meta={}):
                 "texp"          : float(imageHeader['EXP']) / 1000., # in seconds
                 "temperature"   : float(imageHeader['TCAM']),
                 "ser_no"        : imageHeader['SERNO'],
-                "custom1"       : float(imageHeader['GAIN']),
-                "custom_dt"     :  datetime.strptime(imageHeader['ENDTIME'],
-                                                     '%Y.%m.%dZ%H:%M:%S.%f') })
+                "user_param1"   : float(imageHeader['GAIN']) })
+                #"user_param_dt"   :  datetime.strptime(imageHeader['ENDTIME'],
+                #                                     '%Y.%m.%dZ%H:%M:%S.%f') 
     return (image, meta) 
 
 if __name__ == "__main__":

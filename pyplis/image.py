@@ -157,9 +157,11 @@ class Img(object):
                         ("file_type"     ,   ""),
                         ("device_id"     ,   ""),
                         ("ser_no"        ,   ""),
-                        ("temperature"   ,   float('nan')),   # temperature in Celsius
+                        ("temperature"   ,   nan),#float('nan')),   # temperature in Celsius
                         ("img_idx"       ,   int(0)),    # index in multi-img file formats as *.fits
-                        ("custom1"       ,   nan),  # 3 dummy attributes which can be used for custom defined parameters
+                        ("fits_idx"      ,   int(0)),
+                        ("user_param1"   ,   nan),
+                        ("user_param2"   ,   nan),  # 3 dummy attributes which can be used for custom defined parameters
                         ("custom2"       ,   nan),
                         ("custom3"       ,   nan),
                         ("custom_float"  ,   float('nan')),

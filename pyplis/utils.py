@@ -1629,6 +1629,7 @@ class Filter(object):
         """print __str__"""
         print self.__str__()
 
+
 class DarkOffsetInfo(object):
     """Base class for storage of dark offset information 
     

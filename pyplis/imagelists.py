@@ -614,7 +614,7 @@ class BaseImgList(object):
     def load(self):
         """Load current image
         
-        Try to load the current file ``self.files[self.cfn]`` and if remove the 
+        Try to load the current file ``self.files[self.cfn]`` and remove the 
         file from the list if the import fails
         
         Returns
@@ -1104,10 +1104,15 @@ class BaseImgList(object):
             average image 
         """
         cfn = self.index
-        if isinstance(start_idx, datetime):
-            start_idx = self.timestamp_to_index(start_idx)
-        if isinstance(stop_idx, datetime):
-            stop_idx = self.timestamp_to_index(stop_idx)
+        # If timestamps are given, convert to list indices
+        try:
+            if isinstance(start_idx, datetime):
+                start_idx = self.timestamp_to_index(start_idx)
+            if isinstance(stop_idx, datetime):
+                stop_idx = self.timestamp_to_index(stop_idx)
+        except TypeError:
+            print('Giving indices as datetime objects are only supported if' 
+                  'acquisition times can be accessed from filenames')
         if stop_idx is None or stop_idx > self.nof:
             stop_idx = self.nof
             
@@ -1136,6 +1141,55 @@ class BaseImgList(object):
             img.meta["texp"] = asarray(texps).mean()
         self.goto_img(cfn)
         return img
+    
+    def get_mean_img2(self, start_idx=0, stop_idx=None):
+        """ Same functionality as get_mean_img() but will perform better. All 
+        to-be averaged images are saved to memory, so this method works only
+        for reasonable amounts of iamges.
+        Reason: Img.img are already numpy arrays for which native methods run
+        fastest.
+        
+        Note: `np.mean` can handle masked arrays
+        """
+        if stop_idx is None: stop_idx = self.nof
+        
+        n_img = stop_idx - start_idx + 1 #including second idx
+        if n_img > 500:
+            warn("Averaging more than 500 images in a single step")
+        if stop_idx <= start_idx:
+            warn('Second index is smaller than or equal to first index')
+        if stop_idx > self.nof:
+            warn("Second index is larger than the total file number")
+            
+        if not self.cfn == start_idx:
+            self.goto_img(start_idx)        
+        ### Keep meta data of the first image and only update few things
+        meta_start = self.this.meta
+        start_acq = self.this.meta["start_acq"]
+        
+        images = []
+        texps = []
+        temperatures = []
+        for i in range(n_img):
+            images.append(self.this.img)
+            texps.append(self.this.meta["texp"])
+            temperatures.append(self.this.meta["temperature"])
+            self.goto_next()
+        
+        images = array(images)
+        img_avg = images.mean(axis=0)
+        
+        Img_avg = Img(img_avg)
+        Img_avg.edit_log = self.this.edit_log
+        Img_avg.meta = meta_start
+        Img_avg.meta["start_acq"] = start_acq
+        Img_avg.meta["stop_acq"] = self.this.meta["stop_acq"]
+        Img_avg.meta["texp"] = array(texps).mean()
+        Img_avg.meta["temperature"] = array(temperatures).mean()
+        return Img_avg
+        
+        
+        
     
     def get_mean_tseries_rects(self, start_idx, stop_idx, *rois):
         """Similar to :func:`get_mean_value` but for multiple rects
@@ -2974,7 +3028,9 @@ class ImgList(BaseImgList):
     def load(self):
         """Try load current and next image"""
         self.change_index_linked_lists() #based on current index in this list
-        if not super(ImgList, self).load():
+        try:
+            super(ImgList, self).load()
+        except:
             print ("Image load aborted...")
             return False
         if self.nof > 1:

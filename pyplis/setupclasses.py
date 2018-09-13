@@ -29,9 +29,10 @@ from datetime import datetime
 from collections import OrderedDict as od
 from copy import deepcopy
 from os.path import exists
-from numpy import nan, rad2deg, arctan
+from numpy import nan, rad2deg, arctan, array, float64
 from abc import ABCMeta
 from warnings import warn
+from cv2 import getOptimalNewCameraMatrix,undistort
 
 from .forms import LineCollection, RectCollection  
 from .helpers import isnum, to_datetime
@@ -271,6 +272,194 @@ class Source(object):
         """Make object callable (access item)"""
         return self.__getitem__(key)
         
+ 
+class Optics(object):
+    """Object representing an optical subunit of the camera.
+    SO2 cameras typically consists either of one detector with one lens and a 
+    filter wheel containing several interference filters or several detectors 
+    with seperate lenses and filters. The optical properties might not be the 
+    same for each subunit and have to be stored therefore separately.
+    For filter wheel cameras, the detector's and lens' properties will be of 
+    course the same.
+    
+    A low level helper class to store information of interference filters.    
+    """          
+    def __init__(self, id=None):      
+        """Initiation of object
+        
+        :param str id : string identification of this object for 
+            working environment
+        """
+        self.id = id
+
+        self.camera = {'serial_nr' :        None,
+                       'pixel_width' :      None, # in m
+                       'pixel_height' :     None, # in m
+                       'pixel_columns' :    None,
+                       'pixel_rows' :       None,
+                       'focal_length' :     None, # in m
+                       'aspect_ratio' :     None,
+                       'binning_columns' :  1,
+                       'binning_rows' :     1,
+                       'wavelength' : None,
+                       'distortion' :       array([[0.,0.,0.,0.,0.]])}
+
+    def update(self, **settings):
+        """Update camera parameters
+            
+            Parameters
+            ----------
+            settings : dict
+                dictionary containing camera parametrs (valid keys are 
+                all keys of ``self.__dict__`` and from dictionary 
+                ``self.geom_data``)
+        """
+        for key, val in settings.iteritems():
+            self.camera[key] = val
+
+    def intrinsic_matrix(self):
+        """ Define the intrinsic camera matrix from the internal parameters stored
+        in `self.camera` """
+        fx = self.camera['focal_length']/(self.camera['pixel_width']*self.camera['binning_columns'])
+        fy = self.camera['focal_length']/(self.camera['pixel_height']*self.camera['binning_rows'])
+        cx = self.camera['pixel_columns']/(2*self.camera['binning_columns'])
+        cy = self.camera['pixel_row']/(2*self.camera['binning_rows'])
+        
+        return array([(fx, 0, cx),
+                        (0, fy, cy),
+                         (0, 0, 1)],
+                        dtype=float64)
+
+    def intrinsic_matrix_with_distortion(self):
+        """ Include the distortion in the intrinsic _matrix """
+        mtx = self.intrinsic_matrix()
+        w = self.camera['pixel_columns']
+        h = self.camera['pixel_row']
+        dist = self.camera['distortion']
+        new_cameraMatrix, roi = getOptimalNewCameraMatrix(mtx, dist, (w,h), 1, (w,h))
+        return new_cameraMatrix
+        
+    def undistort_img(self, image):
+        mtx = self.intrinsic_matrix()
+        mtx_new = self.intrinsic_matrix_with_distortion()
+        dist = self.camera['distortion']
+        return undistort(image, mtx, dist, None, mtx_new)
+    
+class Camera2(object):
+    """ A camera object without all the file name handling """
+    
+    def __init__(self, id=None):
+        
+        self.id = id
+        
+        self.geom_data = { "lon"         :   None,
+                           "lat"         :   None,
+                           "altitude"    :   None, # altitude of topology at lon,lat
+                           "alt_offset"  :   0.0,  # above ground in m
+                           "azim"        :   None,
+                           "azim_err"    :   None,
+                           "elev"        :   None,
+                           "elev_err"    :   None,
+                           "tilt"        :   0.,
+                           "tilt_err"    :   0.}
+        
+        self.optics = []   
+        
+    @property
+    def lon(self):
+        """Camera longitude"""
+        return self.geom_data["lon"]
+
+    @lon.setter
+    def lon(self, val):
+        if not -180 <= val <= 180:
+            raise ValueError("Invalid input for longitude, must be between"
+                "-180 and 180")
+        self.geom_data["lon"] = val
+    
+    @property
+    def lat(self):
+        """Camera latitude"""
+        return self.geom_data["lat"]
+
+    @lat.setter
+    def lat(self, val):
+        if not -90 <= val <= 90:
+            raise ValueError("Invalid input for longitude, must be between"
+                "-90 and 90")
+        self.geom_data["lat"] = val
+    
+    @property
+    def altitude(self):
+        """Camera altitude in m
+        
+        Note
+        ----
+        This is typically the local topography altitude, which can for 
+        instance be accessed automatically based on camera position (lat, lon) 
+        using :func:`get_altitude_srtm`. Potential offsets (i.e. elevated 
+        positioning due to tripod or measurement from a house roof) can be 
+        specified using :attr:`alt_offset`.
+        """
+        return self.geom_data["altitude"]
+
+    @altitude.setter
+    def altitude(self, val):
+        self.geom_data["altitude"] = val
+        
+    @property
+    def elev(self):
+        """Viewing elevation angle (center pixel) in degrees
+        
+        0 refers to horizon, 90 to zenith
+        """
+        return self.geom_data["elev"]
+
+    @elev.setter
+    def elev(self, val):
+        self.geom_data["elev"] = val
+    
+    @property
+    def elev_err(self):
+        """Uncertainty in viewing elevation angle in degrees"""
+        return self.geom_data["elev_err"]
+
+    @elev_err.setter
+    def elev_err(self, val):
+        self.geom_data["elev_err"] = val
+    
+    @property
+    def azim(self):
+        """Viewing azimuth angle in deg relative to north (center pixel)"""
+        return self.geom_data["azim"]
+
+    @azim.setter
+    def azim(self, val):
+        self.geom_data["azim"] = val
+    
+    @property
+    def azim_err(self):
+        """Uncertainty in viewing azimuth angle in degrees"""
+        return self.geom_data["azim_err"]
+
+    @azim_err.setter
+    def azim_err(self, val):
+        self.geom_data["azim_err"] = val
+        
+    @property
+    def alt_offset(self):
+        """Height of camera position above topography in m
+        
+        This offset can be added in case the camera is positioned above the 
+        ground and is only required if :param:`altitude` corresponds to the 
+        topographic elevation
+        """
+        return self.geom_data["alt_offset"]
+
+    @alt_offset.setter
+    def alt_offset(self, val):
+        self.geom_data["alt_offset"] = val
+    
 class FilterSetup(object):
     """A collection of :class:`pyplis.utils.Filter` objects
     

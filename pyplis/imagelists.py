@@ -105,7 +105,7 @@ class BaseImgList(object):
         self._integration_step_lengths = None
         self._plume_dists = None
         
-        self.set_camera(camera=camera, cam_id=None)
+        self.camera = camera
         
         self._update_cam_geodata = False
         self._edit_active = True
@@ -717,7 +717,7 @@ class BaseImgList(object):
         
     def has_files(self):
         """Returns boolean whether or not images are available in list"""
-        return bool(self.nof)
+        return bool(self.nof) and bool(self.camera)
     
     def plume_dist_access(self):
         """Checks if measurement geometry is available"""

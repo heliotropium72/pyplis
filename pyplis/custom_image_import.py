@@ -53,6 +53,7 @@ from cv2 import resize
 from os.path import basename
 from datetime import datetime, timedelta
 from .helpers import matlab_datenum_to_datetime
+#from .image import Img
 
 from re import sub
 
@@ -60,6 +61,12 @@ try:
     from PIL.Image import open as open_pil
 except:
     warn("Python Imaging library PIL could not be imported")
+    
+#def load_pyplis_fits(file_path, meta={}):
+#    """ Load files which were saved with pyplis.Img.save_as_fits() """
+#    image = Img()
+#    image.load_fits(file_path)
+#    return (image.img, image.meta)
 
 def load_ecII_fits(file_path, meta={}, **kwargs):
     """Load NILU ECII camera FITS file and import meta information"""

@@ -1873,7 +1873,10 @@ class ImgList(BaseImgList):
         # These dicitonaries contain lists with dark and offset images 
         self.dark_lists = od()
         self.offset_lists = od()
-        self._dark_corr_opt = self.camera.darkcorr_opt
+        if self.camera is not None:
+            self._dark_corr_opt = self.camera.darkcorr_opt
+        else:
+            self._dark_corr_opt = 0
         
         self._last_dark = None
         
@@ -2920,7 +2923,8 @@ class ImgList(BaseImgList):
         
         if self.linked_lists.has_key(list_id):
             raise AttributeError("ImgList %s has already linked an ImgList "
-                                 "with list_id %s. Please choose a different ID")
+                                 "with list_id %s. Please choose a different ID"
+                                 %(self.list_id, list_id))
         self.linked_lists[list_id] = other_list
         #self._linked_indices[list_id] = {}
         self._always_reload[list_id] = always_reload
@@ -3938,17 +3942,21 @@ class ImgListLayered(ImgList):
             try:
                 self.metaData = meta
             except:
+                print('Meta DataFrame for imagelist could not be set.')
                 self.metaData = self.get_img_meta_all()
         else:
-            self.metaData = self.get_img_meta_all()
+            if bool(files):
+                self.metaData = self.get_img_meta_all()
+            else:
+                self.metaData = None
 
-        # Image referencing by two information: file and image layer
-        # filename subindex (file is repeated m_n times)
-        self.files = self.metaData['file'].values
-        # image layer inside fits file
-        self.hdu_nr = self.metaData['hdu_nr'].values
-                                      
         if self.data_available and init:
+            # Image referencing by two information: file and image layer
+            # filename subindex (file is repeated m_n times)
+            self.files = self.metaData['file'].values
+            # image layer inside fits file
+            self.hdu_nr = self.metaData['hdu_nr'].values
+                                      
             self.load()    
 
     def get_img_meta_from_filename(self, file_path):

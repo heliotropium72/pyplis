@@ -104,6 +104,9 @@ class BaseImgList(object):
         #attributes
         self._integration_step_lengths = None
         self._plume_dists = None
+        # This should be set via the start_acq property when timestamps are not
+        # available from filename; otherwise leave None
+        self._timestamps = None 
         
         self.camera = camera
         
@@ -483,17 +486,29 @@ class BaseImgList(object):
     def has_images(self):
         """Wrapper for :func:`has_files`"""
         return self.has_files()
-    
+        
     @property
     def start_acq(self):
         """Array containing all image acq. time stamps of this list
         
         Note
         ----
-        The time stamps are extracted from the file names
+        The time stamps are extracted from the file names; if this is not
+        possible, set the timestamps before
         """
-        ts = self.get_img_meta_all_filenames()[0]
-        return ts
+        if self._timestamps is not None:
+            return self._timestamps
+        else:
+            try:
+                return self.get_img_meta_all_filenames()[0]           
+            except:
+                raise AttributeError("Timestamps of start acquistion could "
+                                     "not be accessed from file name but have "
+                                     "not been sat manually before either.")
+    
+    @start_acq.setter
+    def start_acq(self, value):
+        self._timestamps = value
     
     def timestamp_to_index(self, val=datetime(1900,1,1)):
         """Convert a datetime to the list index
@@ -901,8 +916,8 @@ class BaseImgList(object):
             array contining linked indices
         """
         idx_array = zeros(self.nof, dtype=int)
-        times, _ = self.get_img_meta_all_filenames()
-        times_lst, _ = lst.get_img_meta_all_filenames()
+        times = self.start_acq
+        times_lst = lst.start_acq
         if lst.nof == 1:
             warn("Other list contains only one file, assign all indices to "
                  "the corresponding image")
@@ -1499,7 +1514,7 @@ class BaseImgList(object):
         del_x = int((rad.max() - rad.min()) * step_size)
         y_arr = arange(start_y, stop_y, 1)
         ax1 = fig.add_axes([0.1, 0.1, 0.35, 0.8])
-        times = self.get_img_meta_all_filenames()[0]
+        times = self.start_acq
         if any([x == None for x in times]):
             raise ValueError("Cannot access all image acq. times")
         idx = []
@@ -3944,9 +3959,11 @@ class ImgListLayered(ImgList):
             except:
                 print('Meta DataFrame for imagelist could not be set.')
                 self.metaData = self.get_img_meta_all()
+            self._timestamps = self.metaData.index.to_pydatetime()#self.metaData.start_acq.values #Wrapper properties for BaseImgList functionality
         else:
             if bool(files):
                 self.metaData = self.get_img_meta_all()
+                self._timestamps = self.metaData.index.to_pydatetime()#self.metaData.start_acq.values
             else:
                 self.metaData = None
 

@@ -614,9 +614,30 @@ class ImgStack(object):
             - :obj:`list`: list of bad indices (where no overlap was found)
         """
         try:
-            if not time_series.has_start_stop_acqtamps():
-                raise ValueError("No start / stop acquisition time stamps "
-                                 "available in input data...")
+            # This checks only if the start_acq and stop_acq files have invalid data
+            # From pydoas
+            '''
+            def has_start_stop_acqtamps(self):
+                """Checks if start_time and stop_time arrays have valid data"""
+                try:
+                    if not all([isinstance(x, datetime) for x in self.start_acq]):
+                        raise Exception("Invalid value encountered in start_acq")
+                    if not all([isinstance(x, datetime) for x in self.stop_acq]):
+                        raise Exception("Invalid value encountered in stop_acq")
+                    if not all([len(self) == len(x) for x in [self.start_acq,\
+                                                                    self.stop_acq]]):
+                        raise Exception("Lengths of arrays do not match...")
+                    return True
+                except Exception as e:
+                    print((repr(e)))
+                    return False
+        '''
+            from pandas import DataFrame
+            if isinstance(time_series, (DataFrame)):
+                print('Thats a dataframe.')
+            #if not time_series.has_start_stop_acqtamps():
+            #    raise ValueError("No start / stop acquisition time stamps "
+            #                     "available in input data...")
             start_acq = asarray(time_series.start_acq)
             stop_acq = asarray(time_series.stop_acq)
         except:
@@ -957,10 +978,16 @@ class ImgStack(object):
                   %path)
         
         try:
-            hdulist.writeto(path, clobber=overwrite_existing)
-        except:
+            from astropy import __version__ as astropy_v
+            if astropy_v >= '1.3':
+                hdulist.writeto(path, overwrite=overwrite_existing)
+            else:
+                hdulist.writeto(path, clobber=overwrite_existing)
+        except Exception as e:
             warn("Failed to save stack to FITS File "
                  "(check previous warnings)")
+            print('Python exception text: ')
+            print(e)
         
     """Magic methods"""
     def __str__(self):

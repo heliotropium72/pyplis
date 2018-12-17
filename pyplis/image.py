@@ -1147,7 +1147,7 @@ class Img(object):
                 d[k] = v
         return d
     
-    def save_as_fits(self, save_dir=None, save_name=None):
+    def save_as_fits(self, save_dir=None, save_name=None, header_addon=None):
         """Save this image as FITS file
         
         Parameters
@@ -1181,7 +1181,10 @@ class Img(object):
         hdu.header.update(self.edit_log)
         hdu.header.update(self._header_raw)
         hdu.header.update(self._prep_meta_dict_fits())
-        hdu.header["type"] = "pyplis_default"
+        if header_addon is not None:
+            hdu.header.update(header_addon) #Add user defined header to it
+        else:
+            hdu.header["type"] = "pyplis_default"
         hdu.header.append()
     
         roi_abs = fits.BinTableHDU.from_columns([fits.Column(name = "roi_abs",\

@@ -4051,7 +4051,12 @@ class ImgListLayered(ImgList):
         for hdu in range(imgPerFile):
             # Info from image
             image = hdulist[hdu].data    
-            imgFileStop.append(_read_binary_timestamp(image))
+            try:
+                imgFileStop.append(_read_binary_timestamp(image))
+            except ValueError:
+                print('Timestamp could not be set from binary timestamp for '
+                      'file {}, image {} '.format(file_path, hdu))
+                raise ValueError('Binary timestamp (conversion) was invalid')
             image[0,0:14] = image[1,0:14] #replace binary timestamp
             imgFileMin.append(image.min())
             imgFileMax.append(image.max())

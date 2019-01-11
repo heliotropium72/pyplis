@@ -1165,6 +1165,8 @@ class BaseImgList(object):
         fastest.
         
         Note: `np.mean` can handle masked arrays
+        Note: Can easily be adapted to also return the pixelwise standard
+        deviation of the mean image
         """
         if stop_idx is None: stop_idx = self.nof
         
@@ -1193,6 +1195,7 @@ class BaseImgList(object):
         
         images = array(images)
         img_avg = images.mean(axis=0)
+        #img_std = images.std(axis=0) # could be useful to return as well
         
         Img_avg = Img(img_avg)
         Img_avg.edit_log = self.this.edit_log

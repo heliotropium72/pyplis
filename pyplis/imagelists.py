@@ -29,7 +29,7 @@ current and next image).
 """
 from __future__ import (absolute_import, division)
 from numpy import (asarray, zeros, argmin, arange, ndarray, float32, isnan,
-                   logical_or, uint8, exp, ones)
+                   logical_or, uint8, exp, ones, integer)
 from numpy.ma import nomask
 from datetime import timedelta, datetime, date
 
@@ -224,8 +224,8 @@ class BaseImgList(object):
     @property
     def last_index(self):
         """Return index of last image."""
-        if self.files:
-            return len(self.files) - 1
+        if self.nof>0:
+            return int(len(self.files) - 1)
         else:
             return 0
 
@@ -820,7 +820,7 @@ class BaseImgList(object):
             done.
 
         """
-        if not isinstance(to_index, int):
+        if not isinstance(to_index, (int, integer)):
             raise TypeError("Index has to be of type integer.")
         
         if to_index == self.index:
@@ -1297,8 +1297,8 @@ class BaseImgList(object):
         else:
             return Img_avg
 
-    def get_mean_tseries_rects(self, start_idx, stop_idx,
-                               return_dataframe=False, *rois):
+    def get_mean_tseries_rects(self, start_idx, stop_idx, rois,
+                               return_dataframe=False):
         """Similar to :func:`get_mean_value` but for multiple rects.
 
         Parameters
@@ -1308,11 +1308,11 @@ class BaseImgList(object):
         stop_idx : :obj:`int` or :obj:`datetime`
             index of last considered image (if None, the last image in this
             list is used).
+        rois : list
+            list of rectangles (list of 4 entries each) for data access
         return_dataframe : bool
             determines whether a list of :obj:'PixelMeanTimeSeries` or a single
             :obj:`pandas.DataFrame` should be returned.
-        *rois
-            non keyword args specifying rectangles for data access
 
         Returns
         -------

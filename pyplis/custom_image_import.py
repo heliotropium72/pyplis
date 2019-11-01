@@ -307,8 +307,16 @@ def _read_binary_timestamp(timestamp):
             logger.info('Failed to convert the binary timestamp.')
     year = int(values[4] * 100 + values[5])
     microsecond = int(values[11] * 10000 + values[12] * 100 + values[13])
-    endtime = datetime(year, values[6], values[7], values[8], values[9],
+    try:
+        endtime = datetime(year, values[6], values[7], values[8], values[9],
                        values[10], microsecond)
+    except ValueError as err:
+        print('Failed to set datetime from converted timestamp')
+        print('year = {}, month = {}, day = {}'.format(year, values[6], values[7]))
+        print('hour = {}, minute = {}, second = {}, microsecond = {}'.format(values[8],
+                  values[9], values[10], microsecond))
+        raise ValueError(err)
+
     return endtime
 
 
@@ -360,6 +368,11 @@ def load_comtessa(file_path, meta=None):
     # Load the image
     image = hdulist[img_hdu].data
     # read and replace binary time stamp
+    try:
+        endtime = _read_binary_timestamp(image)
+    except ValueError:
+        raise ValueError('Timestamp could not be set from binary timestamp for'
+              ' file {}, image {} '.format(file_path, img_hdu))
     endtime = _read_binary_timestamp(image)
     image[0, 0:14] = image[1, 0:14]
     # load meta data
@@ -370,6 +383,8 @@ def load_comtessa(file_path, meta=None):
                  "texp": float(imageHeader['EXP']) / 1000.,  # in seconds
                  "temperature": float(imageHeader['TCAM']),
                  "ser_no": imageHeader['SERNO'],
-                 "user_param1": float(imageHeader['GAIN'])
+                 "user_param1": float(imageHeader['GAIN']),
+                 "user_param2": datetime.strptime(imageHeader['ENDTIME'],
+                                                  "%Y.%m.%dZ%H:%M:%S.%f")
                  })
     return (image, meta)

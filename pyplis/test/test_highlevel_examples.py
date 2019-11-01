@@ -237,7 +237,8 @@ def test_setup(setup):
     npt.assert_array_equal(vals_exact, nominal_exact)
     npt.assert_allclose(vals_approx, nominal_approx, rtol=1e-4)
 
-
+# pops warning that dark and offset lists have only 1 entry
+@pytest.mark.filterwarnings('ignore::UserWarning')
 def test_dataset(plume_dataset):
     """Test certain properties of the dataset object."""
     ds = plume_dataset
@@ -250,7 +251,8 @@ def test_dataset(plume_dataset):
 
     npt.assert_array_equal(vals_exact, nominal_exact)
 
-
+# pops warning that dark and offset lists have only 1 entry
+@pytest.mark.filterwarnings('ignore::UserWarning')
 def test_find_viewdir(viewing_direction):
     """Correct viewing direction using location of Etna SE crater."""
     vals = [viewing_direction.cam_azim, viewing_direction.cam_azim_err,
@@ -260,7 +262,7 @@ def test_find_viewdir(viewing_direction):
                                  13.72632050624192, 1.0656684171601736],
                         rtol=1e-7)
 
-
+@pytest.mark.filterwarnings('ignore::UserWarning')
 def test_imglists(plume_dataset):
     """Test some properties of the on and offband image lists."""
     on = plume_dataset._lists_intern["F01"]["F01"]
@@ -287,7 +289,8 @@ def test_line(line):
 
     npt.assert_allclose(vals, nominal, rtol=1e-7)
 
-
+# pops warning that dark and offset lists have only 1 entry
+@pytest.mark.filterwarnings('ignore::UserWarning')
 def test_geometry(geometry):
     """Test important results from geometrical calculations."""
     res = geometry.compute_all_integration_step_lengths()
@@ -322,7 +325,8 @@ def test_optflow(plume_img, plume_img_next, line):
     npt.assert_allclose(vals, nominal, rtol=1e-5)
     return flow
 
-
+# pops warning that dark and offset lists have only 1 entry
+@pytest.mark.filterwarnings('ignore::UserWarning')
 def test_auto_cellcalib(calib_dataset):
     """Test if automatic cell calibration works."""
     calib_dataset.find_and_assign_cells_all_filter_lists()
@@ -340,7 +344,8 @@ def test_auto_cellcalib(calib_dataset):
             len(calib_dataset.cell_lists["off"])]
     npt.assert_allclose(nominal, vals, rtol=1e-7)
 
-
+# pops warning that dark and offset lists have only 1 entry
+@pytest.mark.filterwarnings('ignore::UserWarning')
 def test_bg_model(plume_dataset):
     """Test properties of plume background modelling.
 

@@ -556,7 +556,11 @@ class DoasFOVEngine(object):
         self.img_stack = img_stack
         self.doas_series = doas_series
 
-        self.calib_data = DoasCalibData()  # includes DoasFOV class
+        if self.img_stack:
+            print('DoasFOVEngine:' + self.img_stack.camera.cam_id)
+            self.calib_data = DoasCalibData(camera=self.img_stack.camera)
+        else:
+            self.calib_data = DoasCalibData()  # includes DoasFOV class
 
         self.update_search_settings(**settings)
         self.method = method
@@ -727,7 +731,11 @@ class DoasFOVEngine(object):
 
 
         """
-        self.calib_data = DoasCalibData()  # includes DoasCalibData class
+        if self.img_stack:
+            self.calib_data = DoasCalibData(camera=self.img_stack.camera)
+        else:
+            print('No camera defined.')
+            self.calib_data = DoasCalibData()  # includes DoasFOV class
         self.update_search_settings(**settings)
         self.merge_data(merge_type=self._settings["mergeopt"])
         self.det_correlation_image(search_type=self.method)

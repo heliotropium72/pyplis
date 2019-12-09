@@ -1251,7 +1251,7 @@ class BaseImgList(object):
             stop_idx = self.last_index
         elif stop_idx < start_idx:
             raise IndexError('Stop index is smaller than start index')
-        elif stop_idx > self.nof: # must be actually >=, see issue
+        elif stop_idx > self.last_index: # must be actually >=, see issue
             raise IndexError('Stop index is larger than the total file number')
             
         #n_img = self._iter_num(start_idx, stop_idx) # original implementation, see issue
@@ -1261,7 +1261,7 @@ class BaseImgList(object):
                  'averaging in several steops', ResourceWarning)
 
         _cfn = self.index # store for reset to intial state
-        
+
         ### Keep meta data of the first image and only update few things
         self.goto_img(start_idx)
         meta_start = self.this.meta
@@ -1291,6 +1291,7 @@ class BaseImgList(object):
         Img_avg.meta["temperature"] = array(temperatures).mean()
         
         self.goto_img(_cfn)
+        
         if return_full:
             return Img_avg, Img(images.std(axis=0)), Img(images.median(axis=0))
         else:
@@ -4301,3 +4302,165 @@ class ImgListLayered(ImgList):
                     import_method=self.camera.image_import_method,
                     **meta)
         return image
+    
+    
+    def make_stack2(self, new_index, stack_id=None, pyrlevel=None, roi_abs=None,
+                   start_idx=0, stop_idx=None, ref_check_roi_abs=None,
+                   ref_check_min_val=None, ref_check_max_val=None,
+                   dtype=float32):
+        """Stack all images in this list 
+        
+        The stacking is performed using the current image preparation
+        settings (blurring, dark correction etc). Only stack ROI and pyrlevel
+        can be set explicitely.
+        
+        Note
+        ----
+        In case of ``MemoryError`` try stacking less images (specifying 
+        start / stop index) or reduce the size setting a different Gauss
+        pyramid level
+        
+        Difference to make_stack: stack is created by averaging images 
+        between the new_index. ToDo: Add code that for new_index=None,
+        make_stack is used instead (or integrate the two functions)
+        
+        
+        Parameters
+        ----------
+        new_index : pandas timeseries
+            new time index to which the stack will be averaged
+        stack_id : :obj:`str`, optional
+            identification string of the image stack
+        pyrlevel : :obj:`int`, optional
+            Gauss pyramid level of stack
+        roi_abs : list
+            build stack of images cropped in ROI
+        start_idx : int
+            index of first considered image, defaults to 0
+        stop_idx : :obj:`int`, optional
+            index of last considered image (if None, the last image in this 
+            list is used), defaults to last index
+        ref_check_roi_abs : :obj:`list`, optional
+            rectangular area specifying a reference area which can be specified
+            in combination with the following 2 parameters in order to include
+            only images in the stack that are within a certain intensity range
+            within this ROI (Note that this ROI needs to be specified in
+            absolute coordinate, i.e. corresponding to pyrlevel 0).
+        ref_check_min_val : :obj:`float`, optional
+            if attribute ``roi_ref_check`` is a valid ROI, then only images 
+            are included in the stack that exceed the specified intensity 
+            value (can e.g. be optical density or minimum gas CD in calib
+            mode)
+        ref_check_max_val : :obj:`float`, optional
+            if attribute ``roi_ref_check`` is a valid ROI, then only images 
+            are included in the stack that are smaller than the specified 
+            intensity value (can e.g. be optical density or minimum gas CD in 
+            calib mode)    
+        dtype 
+            data type of stack
+            
+        Returns
+        -------
+        ImgStack
+            image stack containing stacked images
+        """
+        
+        self.edit_active =True
+        cfn = self.cfn
+        if isinstance(start_idx, datetime):
+            start_idx = self.timestamp_to_index(start_idx)
+        if isinstance(stop_idx, datetime):
+            stop_idx = self.timestamp_to_index(stop_idx)
+        if stop_idx is None or stop_idx >= self.nof:
+            stop_idx = self.last_index
+        
+        def truncate_to_timeseries(data, timeseries, start_idx=0, stop_idx=-1,):
+            data.sort_index(inplace=True)
+            first = data.index.get_loc(timeseries.index[start_idx], method='bfill')
+            last = data.index.get_loc(timeseries.index[stop_idx], method='ffill')
+            return data.truncate(before=data.index[first], after=data.index[last])
+
+        new_index_trunc = truncate_to_timeseries(new_index, timeseries=self.metaData,
+                                                 start_idx=start_idx, stop_idx=stop_idx)
+        
+        times = deepcopy(new_index_trunc)
+        print_log.info('Create a stack from {:%d/%m/%y %H:%M:%S} to {:%H:%M:%S} with {} entries.'.format(times.index[0], times.index[-1], len(times)-1))
+
+        # Prepare images
+        #num = self._iter_num(start_idx, stop_idx) + 1 # see issue
+        num_new = len(times)-1 #number of images for new index
+        #remember last image shape settings
+        _roi = deepcopy(self._roi_abs)
+        _pyrlevel = deepcopy(self.pyrlevel)
+        _crop = self.crop
+        
+        self.auto_reload = False
+        if pyrlevel is not None and pyrlevel != _pyrlevel:
+            logger.info("Changing image list pyrlevel from %d to %d"
+                  % (_pyrlevel, pyrlevel))
+            self.pyrlevel = pyrlevel
+        if check_roi(roi_abs):
+            logger.info("Activate cropping in ROI %s (absolute coordinates)"
+                  % roi_abs)
+            self.roi_abs = roi_abs
+            self.crop = True
+
+        if stack_id is None:
+            stack_id = self.list_id
+            
+        #create a new settings object for stack preparation
+        self.goto_img(start_idx)
+        self.auto_reload = True
+        h, w = self.current_img().shape
+        stack = ImgStack(h, w, num_new, dtype, stack_id, camera=self.camera,
+                         img_prep=self.current_img().edit_log)
+        lid = self.list_id
+        
+        ###ToDo: include ref_check
+        
+        # Create image stack averaged to these times
+        exp = int(10**exponent(len(times))/4.0)
+        if not exp:
+            exp = 1
+        
+        # Create the stack, one image by a time
+        # Images are directly averaged to timeseries
+        for time_idx in range(len(times)-1):
+            # Console output every exp images
+            if time_idx % exp == 0:
+                print_log.info("Building img-stack from list %s, progress: (%s | %s)" 
+                               %(lid, time_idx, len(times)-1))
+            # 1) Set time interval
+            doas_t1 = times.index[time_idx]
+            doas_t2 = times.index[time_idx+1]
+            # 2) Find the first index after doas_t1
+            #self.metaData.iloc[] to get the row
+            idx_first = self.metaData.index.get_loc(doas_t1,method='bfill')
+            # 3) Find the last index before doas_t2
+            idx_last = self.metaData.index.get_loc(doas_t2,method='ffill')
+            if idx_last < idx_first:
+                print_log.warning("No image data available for averaging within period {:%d.%m.%y %H:%M:%S} to {:%H:%M:%S}".format(doas_t1, doas_t2))
+                continue
+            # 4) Average the image
+            #print('{}: {} to {}'.format(doas_t1, idx_first, idx_last))
+            self.goto_img(idx_first) # not required but avoids some uneccessary output/steps
+            img = self.get_mean_img(idx_first, idx_last)
+            stack.add_img(img.img, img.meta["start_acq"], img.meta["texp"])
+            
+        stack.start_acq = asarray(stack.start_acq)
+        stack.texps = asarray(stack.texps)
+        stack.roi_abs = self._roi_abs
+        
+        print_log.info("Img stack calculation finished, rolling back to intial list"
+            "state:\npyrlevel: %d\ncrop modus: %s\nroi (abs coords): %s "
+            %(_pyrlevel, _crop, _roi))
+        # Reset original state of the image list
+        self.auto_reload = False
+        self.pyrlevel = _pyrlevel
+        self.crop = _crop
+        self.roi_abs = _roi
+        self.goto_img(cfn)
+        self.auto_reload = True
+        if not sum(stack._access_mask) > 0: # all images were excluded
+            raise ValueError("Failed to build stack, stack is empty...")
+        return stack

@@ -523,7 +523,8 @@ class ImgStack(object):
         start_acq_new = asarray(self.start_acq[img_idxs])
         stack_obj_new = ImgStack(stack_id=self.stack_id,
                                  img_prep=self.img_prep, stack=stack_new,
-                                 start_acq=start_acq_new, texps=texps_new)
+                                 start_acq=start_acq_new, texps=texps_new,
+                                 camera=self.camera)
         stack_obj_new.roi_abs = self.roi_abs
         stack_obj_new.add_data = series_new
         return (stack_obj_new, series_new)
@@ -582,7 +583,8 @@ class ImgStack(object):
 
         stack_obj = ImgStack(new_num, h, w,
                              stack_id=self.stack_id,
-                             img_prep=self.img_prep)
+                             img_prep=self.img_prep,
+                             camera=self.camera)
         stack_obj.roi_abs = self.roi_abs
         # print new_stack.shape, new_acq_times.shape, new_texps.shape
         stack_obj.set_stack_data(new_stack, new_acq_times, new_texps)
@@ -665,7 +667,8 @@ class ImgStack(object):
         new_stack = rollaxis(new_stack, 2)
         stack_obj = ImgStack(len(new_texps), h, w,
                              stack_id=self.stack_id,
-                             img_prep=self.img_prep)
+                             img_prep=self.img_prep,
+                             camera=self.camera)
         stack_obj.roi_abs = self.roi_abs
         stack_obj.set_stack_data(new_stack, asarray(new_acq_times),
                                  asarray(new_texps))

@@ -130,15 +130,19 @@ class CalibData(object):
 
         self.time_stamps = time_stamps
 
+        print('CalibData: camera=' + str(camera.cam_id))
         if camera is None:
             camera = Camera()
         self.camera = camera
+        print('CalibData: self.camera=' + str(self.camera.cam_id))
 
         self._senscorr_mask = None
         if senscorr_mask is None:
+            if self.camera.pixnum_y is None:
+                print('Camera was not sufficiently defined.')
             try:
-                senscorr_mask = ones((self.camera.pixnum_y,
-                                      self.camera.pixnum_x))
+                senscorr_mask = Img(ones((self.camera.pixnum_y,
+                                          self.camera.pixnum_x)))
             except BaseException:
                 logger.warning("Could not retrieve image dimensions from camera "
                      "(probably since no camera was provided on input). "
